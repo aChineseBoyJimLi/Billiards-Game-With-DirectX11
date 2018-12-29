@@ -27,6 +27,12 @@
     <ClInclude Include="d3dUtility.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="Objects.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Light.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="d3dUtility.cpp">

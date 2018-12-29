@@ -43,6 +43,14 @@ namespace d3d {
 		WPARAM,
 		LPARAM lParam
 	);
+
+	// ¶¥µã½á¹¹
+	struct Vertex
+	{
+		XMFLOAT3 Pos;
+		XMFLOAT3 Norm;
+		XMFLOAT2 Tex;
+	};
 }
 
 

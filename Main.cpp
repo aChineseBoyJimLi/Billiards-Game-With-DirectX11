@@ -1,4 +1,6 @@
 #include "d3dUtility.h"
+#include "Objects.h"
+#include "Light.h"
 
 //声明全局的指针
 ID3D11Device* device = NULL;//D3D11设备接口
@@ -13,8 +15,11 @@ ID3DX11Effect* effect;
 ID3DX11EffectTechnique* technique;
 ID3D11InputLayout* vertexLayout;
 
-int verticeLength;
+//int verticeLength;
 
+//声明材质和光照的全局对象
+Material floorMaterial;
+Light spotLight;	// 聚光灯
 
 //声明三个坐标系矩阵
 XMMATRIX world;         //用于世界变换的矩阵
@@ -24,12 +29,9 @@ XMMATRIX projection;    //用于投影变换的矩阵
 // 贴图
 ID3D11ShaderResourceView* textureFloor;
 
-// 顶点结构
-struct Vertex
-{
-	XMFLOAT3 Pos;
-	XMFLOAT2 Tex;
-};
+void SetLightEffect();
+
+using namespace d3d;
 
 
 //**************以下为框架函数******************
@@ -76,6 +78,7 @@ bool Setup()
 	// 输入布局
 	D3D11_INPUT_ELEMENT_DESC layout[] = {
 		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
 		{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}
 	};
 	UINT numElements = ARRAYSIZE(layout);
@@ -89,91 +92,17 @@ bool Setup()
 	}
 
 	// 顶点缓存
-	Vertex vertices[] = {
-		{XMFLOAT3(0.0f,0.0f,-2.0f), XMFLOAT2(1.0f,0.0f)},
-		{XMFLOAT3(1.0f,0.0f,-1.0f), XMFLOAT2(0.0f,1.0f)},
-		{XMFLOAT3(1.0f,0.0f,-2.0f), XMFLOAT2(0.0f,0.0f)},
-
-		{XMFLOAT3(-1.0f,0.0f,-2.0f), XMFLOAT2(0.0f,0.0f)},
-		{XMFLOAT3(-1.0f,0.0f,-1.0f), XMFLOAT2(0.0f,1.0f)},
-		{XMFLOAT3(0.0f,0.0f,-2.0f), XMFLOAT2(1.0f,0.0f)},
-
-		{XMFLOAT3(0.0f,0.0f,-1.0f), XMFLOAT2(1.0f,1.0f)},
-		{XMFLOAT3(1.0f,0.0f,-1.0f), XMFLOAT2(0.0f,1.0f)},
-		{XMFLOAT3(0.0f,0.0f,-2.0f), XMFLOAT2(1.0f,0.0f)},
-
-		{XMFLOAT3(0.0f,0.0f,-1.0f), XMFLOAT2(1.0f,1.0f)},
-		{XMFLOAT3(0.0f,0.0f,-2.0f), XMFLOAT2(1.0f,0.0f)},
-		{XMFLOAT3(-1.0f,0.0f,-1.0f), XMFLOAT2(0.0f,1.0f)},
-
-		////////////////////////////////////////////////////////////////////
-		{XMFLOAT3(0.0f,0.0f,0.0f), XMFLOAT2(0.3f,0.7f)},
-		{XMFLOAT3(1.0f,0.0f,-1.0f), XMFLOAT2(1.0f,0.0f)},
-		{XMFLOAT3(0.0f,0.0f,-1.0f), XMFLOAT2(1.0f,0.7f)},
-
-		{XMFLOAT3(0.0f,0.0f,0.0f), XMFLOAT2(0.3f,0.7f)},
-		{XMFLOAT3(0.0f,0.0f,-1.0f), XMFLOAT2(1.0f,0.0f)},
-		{XMFLOAT3(-1.0f,0.0f,-1.0f), XMFLOAT2(1.0f,0.7f)},
-
-		{XMFLOAT3(0.0f,0.0f,0.0f), XMFLOAT2(1.0f,0.0f)},
-		{XMFLOAT3(1.0f,0.0f,0.0f), XMFLOAT2(0.0f,0.0f)},
-		{XMFLOAT3(1.0f,0.0f,-1.0f), XMFLOAT2(0.0f,1.0f)},
-
-		{XMFLOAT3(0.0f,0.0f,0.0f), XMFLOAT2(1.0f,0.0f)},
-		{XMFLOAT3(-1.0f,0.0f,-1.0f), XMFLOAT2(0.0f,1.0f)},
-		{XMFLOAT3(-1.0f,0.0f,0.0f), XMFLOAT2(0.0f,0.0f)},
-
-		/////////////////////////////////////////////////////////////////////
-		{XMFLOAT3(0.0f,0.0f,0.0f), XMFLOAT2(1.0f,0.0f)},
-		{XMFLOAT3(1.0f,0.0f,1.0f), XMFLOAT2(0.3f,0.7f)},
-		{XMFLOAT3(1.0f,0.0f,0.0f), XMFLOAT2(1.0f,0.7f)},
-
-		{XMFLOAT3(0.0f,0.0f,0.0f), XMFLOAT2(1.0f,0.0f)},
-		{XMFLOAT3(-1.0f,0.0f,0.0f), XMFLOAT2(1.0f,0.7f)},
-		{XMFLOAT3(-1.0f,0.0f,1.0f), XMFLOAT2(0.3f,0.7f)},
-
-		{XMFLOAT3(0.0f,0.0f,0.0f), XMFLOAT2(1.0f,0.0f)},
-		{XMFLOAT3(0.0f,0.0f,1.0f), XMFLOAT2(1.0f,0.7f)},
-		{XMFLOAT3(1.0f,0.0f,1.0f), XMFLOAT2(0.3f,0.7f)},
-
-		{XMFLOAT3(0.0f,0.0f,0.0f), XMFLOAT2(1.0f,0.0f)},
-		{XMFLOAT3(-1.0f,0.0f,1.0f), XMFLOAT2(0.3f,0.7f)},
-		{XMFLOAT3(0.0f,0.0f,1.0f), XMFLOAT2(1.0f,0.7f)},
-		
-		////////////////////////////////////////////////////////////////////
-
-		{XMFLOAT3(0.0f,0.0f,2.0f), XMFLOAT2(1.0f,0.0f)},
-		{XMFLOAT3(1.0f,0.0f,2.0f), XMFLOAT2(0.0f,0.0f)},
-		{XMFLOAT3(1.0f,0.0f,1.0f), XMFLOAT2(0.0f,1.0f)},
-		
-
-		{XMFLOAT3(-1.0f,0.0f,2.0f), XMFLOAT2(0.0f,0.0f)},
-		{XMFLOAT3(0.0f,0.0f,2.0f), XMFLOAT2(1.0f,0.0f)},
-		{XMFLOAT3(-1.0f,0.0f,1.0f), XMFLOAT2(0.0f,1.0f)},
-		
-
-		{XMFLOAT3(0.0f,0.0f,1.0f), XMFLOAT2(1.0f,0.7f)},
-		{XMFLOAT3(0.0f,0.0f,2.0f), XMFLOAT2(1.0f,0.0f)},
-		{XMFLOAT3(1.0f,0.0f,1.0f), XMFLOAT2(0.3f,0.7f)},
-
-		{XMFLOAT3(0.0f,0.0f,1.0f), XMFLOAT2(1.0f,0.7f)},
-		{XMFLOAT3(-1.0f,0.0f,1.0f), XMFLOAT2(0.3f,0.7f)},
-		{XMFLOAT3(0.0f,0.0f,2.0f), XMFLOAT2(1.0f,0.0f)},
-		
-	};
-	UINT verCount = ARRAYSIZE(vertices);
-	verticeLength = verCount;
 	D3D11_BUFFER_DESC bd;
 	ZeroMemory(&bd, sizeof(bd));
 	bd.Usage = D3D11_USAGE_DEFAULT;
-	bd.ByteWidth = sizeof(Vertex) * verCount;      //注意：由于这里定义了24个顶点所以要乘以24
-	bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;  //注意：这里表示创建的是顶点缓存
+	bd.ByteWidth = sizeof(Vertex) * verCount; // 这里的 verCount 来自 Objects.h
+	bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;  
 	bd.CPUAccessFlags = 0;
 
 	//声明一个D3D11_SUBRESOURCE_DATA数据用于初始化子资源
 	D3D11_SUBRESOURCE_DATA InitData;
 	ZeroMemory(&InitData, sizeof(InitData));
-	InitData.pSysMem = vertices;
+	InitData.pSysMem = vertices; // 这里 vertices 来自 Objects.h 
 
 	//声明一个ID3D11Buffer对象作为顶点缓存
 	ID3D11Buffer* vertexBuffer;
@@ -193,6 +122,8 @@ bool Setup()
 	//指定图元类型，D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST表示图元为三角形
 	immediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+	
+
 	return true;
 }
 
@@ -211,7 +142,7 @@ void Cleanup()
 bool Display(float timeDelta)
 {
 	if(device){
-		float ClearColor[4] = { 0.0f, 0.125f, 0.3f, 1.0f };
+		float ClearColor[4] = { 0.125f, 0.125f, 0.125f, 1.0f };
 		immediateContext->ClearRenderTargetView(renderTargetView, ClearColor);
 		immediateContext->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.f, 0);
 
@@ -220,21 +151,33 @@ bool Display(float timeDelta)
 		XMVECTOR At = XMVectorSet(0.0f, 0.0f, 0.0f, 0.0f);
 		XMVECTOR Up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 		view = XMMatrixLookAtLH(Eye, At, Up);
+
 		projection = XMMatrixPerspectiveFovLH(XM_PIDIV2, 800.0f/600.0f, 0.01f, 100.0f);
+
 		effect->GetVariableByName("World")->AsMatrix()->SetMatrix((float*)&world);
 		effect->GetVariableByName("View")->AsMatrix()->SetMatrix((float*)&view);
 		effect->GetVariableByName("Projection")->AsMatrix()->SetMatrix((float*)&projection);
+		effect->GetVariableByName("EyePosition")->AsVector()->SetFloatVector((float*)&Eye);
+
+		// 光照特效
+		// 聚光灯
+		// 材质和光照
+		SetLightEffect();
 
 		D3DX11_TECHNIQUE_DESC techDesc;
 		technique->GetDesc(&techDesc);
+
+
+		//设置箱子的纹理
+		effect->GetVariableByName("Texture")->AsShaderResource()->SetResource(textureFloor);
 		technique->GetPassByIndex(0)->Apply(0, immediateContext);
-		immediateContext->Draw(verticeLength, 0);
+		technique->GetPassByIndex(0)->Apply(0, immediateContext);
+		immediateContext->Draw(poolTableVerCount, 0); // 画台球桌
 
 		swapChain->Present(0, 0);
 	}
 	return true;
 }
-//**************框架函数******************
 
 
 //
@@ -290,3 +233,41 @@ int WINAPI WinMain(HINSTANCE hinstance,
 	return 0;
 }
 
+void SetLightEffect() {
+	floorMaterial.ambient = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
+	floorMaterial.diffuse = XMFLOAT4(1.f, 1.f, 1.f, 1.0f);
+	floorMaterial.specular = XMFLOAT4(0.3f, 0.3f, 0.3f, 16.0f);
+	floorMaterial.power = 5.0f;
+
+	spotLight.position = XMFLOAT4(0.0f, 7.0f, 0.0f, 1.0f); //光源位置
+	spotLight.direction = XMFLOAT4(0.0f, -1.0f, 0.0f, 1.0f); //光照方向
+	spotLight.ambient = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);   //前三位分别表示红绿蓝光的强度
+	spotLight.diffuse = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);   //同上
+	spotLight.specular = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);  //同上
+	spotLight.attenuation0 = 0;    //常量衰减因子
+	spotLight.attenuation1 = 0.1f; //一次衰减因子
+	spotLight.attenuation2 = 0;    //二次衰减因子
+	spotLight.alpha = XM_PI / 10;   //内锥角度
+	spotLight.beta = XM_PI / 5;    //外锥角度
+	spotLight.fallOff = 1.0f;      //衰减系数，一般为1.0
+
+	effect->GetVariableByName("LightAmbient")->AsVector()->SetFloatVector((float*)&(spotLight.ambient));
+	effect->GetVariableByName("LightDiffuse")->AsVector()->SetFloatVector((float*)&(spotLight.diffuse));
+	effect->GetVariableByName("LightSpecular")->AsVector()->SetFloatVector((float*)&(spotLight.specular));
+	effect->GetVariableByName("LightPosition")->AsVector()->SetFloatVector((float*)&(spotLight.position));
+	effect->GetVariableByName("LightDirection")->AsVector()->SetFloatVector((float*)&(spotLight.direction));
+	effect->GetVariableByName("LightAtt0")->AsScalar()->SetFloat(spotLight.attenuation0);
+	effect->GetVariableByName("LightAtt1")->AsScalar()->SetFloat(spotLight.attenuation1);
+	effect->GetVariableByName("LightAtt2")->AsScalar()->SetFloat(spotLight.attenuation2);
+	effect->GetVariableByName("LightAlpha")->AsScalar()->SetFloat(spotLight.alpha);
+	effect->GetVariableByName("LightBeta")->AsScalar()->SetFloat(spotLight.beta);
+	effect->GetVariableByName("LightFallOff")->AsScalar()->SetFloat(spotLight.fallOff);
+
+	effect->GetVariableByName("MatAmbient")->AsVector()->SetFloatVector((float*)&(floorMaterial.ambient));
+	effect->GetVariableByName("MatDiffuse")->AsVector()->SetFloatVector((float*)&(floorMaterial.diffuse));
+	effect->GetVariableByName("MatSpecular")->AsVector()->SetFloatVector((float*)&(floorMaterial.specular));
+	effect->GetVariableByName("MatPower")->AsScalar()->SetFloat(floorMaterial.power);
+
+	//将聚光灯光源的Tectnique设置到Effect
+	technique = effect->GetTechniqueByName("T_SpotLight");
+}
